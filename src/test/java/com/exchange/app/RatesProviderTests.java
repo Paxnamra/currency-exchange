@@ -1,20 +1,23 @@
 package com.exchange.app;
 
 import org.joda.time.DateTime;
+import org.joda.time.LocalDate;
+import org.joda.time.LocalDateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
+import java.text.DateFormat;
 import java.util.*;
 
-import static org.assertj.core.api.Assertions.anyOf;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.anyString;
 
 class RatesProviderTests {
 
@@ -133,6 +136,46 @@ class RatesProviderTests {
         Mockito.verify(apiClient).getLatestRates();
     }
 
+    @Test
+    @DisplayName("SEK to USD on given historical date")
+    void shouldGetExchangeRateForGivenDate() {
+        //given
+        ForeignExchangeRatesApiClient apiClient = Mockito.mock(ForeignExchangeRatesApiClient.class);
+        DateTimeFormatter dtf = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss");
+        LocalDateTime ldt = LocalDateTime.parse("2020-05-12 08:30:15", dtf);
+
+        ExchangeRates exchangeData = new ExchangeRates("SEK", ldt.toDateTime(), rates);
+        rates.put("USD", 4.70);
+
+        Mockito.when(apiClient.getHistoricalRates(ldt.toDateTime())).thenReturn(exchangeData);
+
+        RatesProvider rp = new RatesProvider(apiClient);
+        //when
+        Double actual = rp.getExchangeRateForDate(Currency.getInstance(USD), ldt.toDateTime());
+        Double expected = 4.70;
+        //then
+        assertThat(actual).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("SEK to USD on given historical date")
+    void shouldGetExchangeRateForGivenDate_withBuilder() {
+        //given
+        ForeignExchangeRatesApiClient apiClient = Mockito.mock(ForeignExchangeRatesApiClient.class);
+        DateTimeFormatter dtf = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss");
+        LocalDateTime ldt = LocalDateTime.parse("2019-04-01 14:00:20", dtf);
+
+        ExchangeRates er = new RatesForCurrencyForDayBuilder().basedSEK().forDay(ldt.toDateTime()).addRate("SEK", rates.put("USD", 3.12)).build();
+        Mockito.when(apiClient.getHistoricalRates(ldt.toDateTime())).thenReturn(er);
+
+        RatesProvider rp = new RatesProvider(apiClient);
+        //when
+        Double actual = rp.getExchangeRateForDate(Currency.getInstance(USD), ldt.toDateTime());
+        Double expected = 3.12;
+        //then
+        assertThat(actual).isEqualTo(expected);
+    }
+
     private ExchangeRates initializeExchangeRates() {
         rates.put(USD, 1.22);
         rates.put(SEK, 10.30);
@@ -148,5 +191,4 @@ class RatesProviderTests {
     private ExchangeRates initializeExchangeRates(String base, DateTime date, Map<String, Double> rates) {
         return new ExchangeRates(base, date, rates);
     }
-
 }
